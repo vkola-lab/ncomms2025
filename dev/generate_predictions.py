@@ -153,11 +153,6 @@ def generate_performance_report(dat_tst, y_pred, scores_proba):
     return met
     
 def roc_auc_scores(y_true, y_pred, features):
-    # n_classes = y_true.shape[1]
-    # print(features)
-    # print(y_true)
-
-    # raise ValueError
 
     tpr = dict()
     fpr = dict()
@@ -295,10 +290,3 @@ if __name__ == '__main__':
     met_df = pd.DataFrame(met)
     print(met_df.round(2))
 
-    #%%
-    # 2. Generate prediction for a single case
-    # replace this dictionary with a dictionary of input features
-    # test_case = {'his_NACCREAS': 0.0, 'his_NACCREFR': 2.0, 'his_SEX': 0, 'his_HISPANIC': 1, 'his_HISPOR': 1.0, 'his_RACE': 0, 'his_RACESEC': 3.0, 'his_PRIMLANG': 0.0, 'his_MARISTAT': 2.0, 'his_LIVSIT': 0.0, 'his_INDEPEND': 0.0, 'his_RESIDENC': 0.0, 'his_HANDED': 1.0, 'his_NACCNIHR': 5, 'his_NACCFAM': 1.0, 'his_NACCMOM': 0.0, 'his_NACCDAD': 1.0, 'his_NACCFADM': 0.0, 'his_NACCAM': 0.0, 'his_NACCFFTD': 0.0, 'his_NACCFM': 0.0, 'his_NACCOM': 0.0, 'his_TOBAC30': 0.0, 'his_TOBAC100': 1.0, 'his_CVHATT': 0.0, 'his_CVAFIB': 0.0, 'his_CVANGIO': 0.0, 'his_CVBYPASS': 0.0, 'his_CVPACE': 0.0} # example case
-    
-    # scores, scores_proba, y_pred = generate_predictions_for_case(test_case)
-    # print(scores_proba)

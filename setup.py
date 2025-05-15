@@ -7,8 +7,8 @@ with open('./requirements.txt') as f:
 setuptools.setup(
     name = 'adrd',
     version = '0.0.1',
-    author = 'Chonghua Xue',
-    author_email = 'cxue2@bu.edu',
+    author = 'Sahana Kowhsik',
+    author_email = 'skowshik@bu.edu',
     url = 'https://github.com/vkola-lab/adrd_tool/',
     # description = '',
     packages = setuptools.find_packages(),
