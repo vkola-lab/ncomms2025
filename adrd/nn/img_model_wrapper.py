@@ -1,10 +1,46 @@
 import torch
-from .. import nn
-from .. import model
+# from .. import nn
+# from .. import model
 import numpy as np
 from icecream import ic
 from monai.networks.nets.swin_unetr import SwinUNETR
 from typing import Any
+# from .conv_layers import ConvClassifierNorm
+
+def normalization(planes, norm='bn', eps=1e-4):
+    if norm == 'bn':
+        m = torch.nn.BatchNorm3d(planes)
+    elif norm == 'gn':
+        m = torch.nn.GroupNorm(4, planes)
+    elif norm == 'in':
+        m = torch.nn.InstanceNorm3d(planes, eps=eps)
+    # elif norm == 'sync_bn':
+    #     m = SynchronizedBatchNorm3d(planes)
+    else:
+        raise ValueError('normalization type {} is not supported'.format(norm))
+    return m
+
+class general_conv3d(torch.nn.Module):
+    def __init__(self, in_ch, out_ch, k_size=3, stride=1, padding=1, pad_type='zeros', norm='in', is_training=True, act_type='lrelu', relufactor=0.2):
+        super(general_conv3d, self).__init__()
+        self.conv = torch.nn.Conv3d(in_channels=in_ch, out_channels=out_ch, kernel_size=k_size, stride=stride, padding=padding, padding_mode=pad_type, bias=True)
+
+        self.norm = normalization(out_ch, norm=norm)
+        if act_type == 'relu':
+            self.activation = torch.nn.ReLU(inplace=True)
+        elif act_type == 'lrelu':
+            self.activation = torch.nn.LeakyReLU(negative_slope=relufactor, inplace=True)
+    
+    def forward(self, x, last=False):
+        x = self.conv(x)
+        x = torch.clamp(x, min=-1e4, max=1e4)  # Clamp to avoid extreme values
+        assert not torch.isnan(x).any(), "NaN detected after convolution & clamping"
+        if not last:
+            x = self.norm(x)
+            assert not torch.isnan(x).any(), "NaN detected after normalization"
+        x = self.activation(x)
+        assert not torch.isnan(x).any(), "NaN detected after activation"
+        return x
 
 class ImagingModelWrapper(torch.nn.Module):
     def __init__(
@@ -73,6 +109,8 @@ class ImagingModelWrapper(torch.nn.Module):
                 for i in range(self.layers):
                     if i == self.layers - 1:
                         dim_out = self.out_dim
+                        # dim_out = 1
+                        # print(layers)
                         ks = 2
                         stride = 2
                     else:
@@ -92,10 +130,28 @@ class ImagingModelWrapper(torch.nn.Module):
                     downsample.append(
                         torch.nn.ReLU()
                     )
-                # downsample.append(torch.nn.Linear(8, self.out_dim))
-                    
                     
                 self.downsample = torch.nn.Sequential(*downsample)
+                # self.linear = torch.nn.Linear(1, self.out_dim)
+                
+                # downsample = torch.nn.ModuleList()
+                # dim = self.dim
+
+                # for i in range(self.layers):
+                #     if i == self.layers - 1:
+                #         dim_out = self.out_dim
+                #     else:
+                #         dim_out = dim // 2
+                    
+                #     # Using Conv3D for spatial downsampling
+                #     downsample.append(torch.nn.Conv3d(in_channels=dim, out_channels=dim_out, kernel_size=2, stride=1, padding=1, padding_mode='zeros', bias=True))
+                #     downsample.append(torch.nn.BatchNorm3d(dim_out))
+                #     downsample.append(torch.nn.ReLU())
+                #     dim = dim_out
+                    
+                # self.downsample = torch.nn.Sequential(*downsample)
+                # self.pool = torch.nn.AdaptiveAvgPool3d(1)
+                
             elif self.fusion_stage == 'late':
                 self.downsample = torch.nn.Identity()
             else:
@@ -162,15 +218,36 @@ class ImagingModelWrapper(torch.nn.Module):
             # print('x: ', x.size())    
             out = self.downsample(x)
             # print('out: ', out.size())
+            # out = out.view(out.size(0), out.size(1), -1)
+            # print('out: ', out.size())
             if self.fusion_stage == 'middle':
                 if "vit" in self.arch.lower() or "swinunetr" in self.arch.lower():
                     out = torch.mean(out, dim=-1)
-                    # out = torch.mean(out, dim=1)
                 else:
-                    out = torch.squeeze(out, dim=1)
+                    out = torch.squeeze(out)
             elif self.fusion_stage == 'late':
-                pass
-            # print(out.shape)
+                pass 
+            # print('out: ', out.size())
+            # out = self.linear(out)
+            # print('out: ', out.size())
+            
+            # print('out: ', out.size())
+            
+            
+        # x = torch.squeeze(x, dim=1)
+        # # print('x: ', x.size())    
+        # out = self.downsample(x)
+        # # print('out: ', out.size())
+        # out = self.pool(out)
+        # # print('out: ', out.size())
+        # out = out.view(out.size(0), out.size(1))
+        # # print('out: ', out.size())
 
         return out
 
+
+if __name__ == '__main__':
+    ''' for testing purpose only '''
+    model = ImagingModelWrapper(arch='SwinUNETREMB', layers=2, out_dim=256)
+    data = torch.randn(10, 1, 768, 8, 8, 8)  # Example data
+    out = model(data)

@@ -17,7 +17,6 @@ from collections import defaultdict
 from time import time
 from copy import deepcopy
 from icecream import ic
-# from adrd.nn import ImageModel
 #%%
 
 
@@ -66,6 +65,7 @@ class CSVDataset:
 
         # omit features that are not present in dat_file
         features = [fea for fea in features if fea in df.columns]
+        shapes = []
 
         # mri
         img_fea_to_pop = []
@@ -111,9 +111,14 @@ class CSVDataset:
                                 npy.append(None)
                                 continue
                             
-                            if 'swinunet' in fn.lower():
-                                if len(data.shape) < 5:
-                                    data = np.expand_dims(data, axis=0)
+                            if data.shape[-1] == 9 or data.shape[-1] == 10:
+                                npy.append(None)
+                                continue
+                            
+                            shapes.append(data.shape)
+                            
+                            if len(data.shape) < 5:
+                                data = np.expand_dims(data, axis=0)
                                     
                             npy.append(data)
 
@@ -127,7 +132,8 @@ class CSVDataset:
                             npy.append(None)
                     # print(self.cnf['feature'][fea]['shape'])
                     print(f"{n} MRI embeddings found with shape {self.cnf['feature'][fea]['shape']}")
-                    
+                    if n == 0 or len(self.cnf['feature'][fea]['shape']) == 1:
+                        error_features.append(fea)
                     total += n
                     print(len(df), len(npy))
                     df[fea] = npy

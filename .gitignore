@@ -172,3 +172,17 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+
+figures/extended_fig_1_.ipynb
+test.csv
+test1.csv
+docs/
+efig1_generate_data1.ipynb
+figEF4b*
+figEF1a*
+efig1.ipynb
+efig1_1.ipynb
+test*
+radar_plots.png
+efig1/

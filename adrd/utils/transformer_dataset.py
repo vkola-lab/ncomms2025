@@ -46,7 +46,6 @@ class TransformerDataset(torch.utils.data.Dataset):
         self.fmt_tgt = Formatter(tgt_modalities)
         self.tgt = [self.fmt_tgt(smp) for smp in tgt]
         self.tgt_modalities = tgt_modalities
-        # self.tgt = tgt
 
         self.img_transform = img_transform
 

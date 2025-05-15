@@ -977,7 +977,7 @@ class ADRDModel(BaseEstimator):
                     adrd_ckpt_path = '/projectnb/vkolagrp/projects/adrd/NMED_submission_github/nmed2024/dev/ckpt/ckpt_swinunetr_stripped_MNI.pt'
                     print(f"Using adrd checkpoint for stage {self.stage}, {adrd_ckpt_path}")
                 elif self.stage == 2:
-                    adrd_ckpt_path = "/projectnb/vkolagrp/skowshik/pet_project/mri_pet/adrd_tool/dev/ckpt_all/harmonization_by_cohort_on_regions_no_volume_weighted/finetuning_stage_1_new_harmonized_freeze_15_epochs_early_stopping_15_no_RL_no_fhs_mris_amy_tau_wd_0.01_ds_2_lr_1e3_cosine_no_plasma_181/ckpt_run_2_AUROC_split_0.pt"
+                    adrd_ckpt_path = "../../ckpt/model_stage_1.ckpt"
                     
                     print(f"Using amyloid and tau checkpoint for stage {self.stage}, {adrd_ckpt_path}")
                 else:

@@ -40,6 +40,7 @@ def get_metrics(y_true, y_pred, scores, mask):
             prc = TP / (TP + FP)
             f1s = 2 * (prc * sen) / (prc + sen)
             mcc = (TP / N - S * P) / np.sqrt(P * S * (1 - S) * (1 - P))
+            NPV = TN / (TN + FN)
 
             # metrics that are based on scores,
             try:
@@ -67,6 +68,7 @@ def get_metrics(y_true, y_pred, scores, mask):
         met['MCC'] = mcc
         met['AUC (ROC)'] = auc_roc
         met['AUC (PR)'] = auc_pr
+        met['NPV'] = NPV
         
     return met
 

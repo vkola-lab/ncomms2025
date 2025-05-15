@@ -36,46 +36,13 @@ from monai.transforms import (
     RandCoarseShuffled,
     Resized,
 )
+from sklearn.metrics import roc_auc_score, roc_curve, auc
 
 from data.dataset_csv import CSVDataset
 from adrd.model import ADRDModel
 from adrd.utils.misc import get_and_print_metrics_multitask
 from adrd.utils.misc import get_metrics, print_metrics
 
-#%%
-# define paths and variables
-
-fname = 'name_of_file' # the name of file you want to save the model predictions to
-save_path = f'./model_predictions/' # the path where the model predictions will be saved
-# dat_file = 'path/to/test/data' # the test data path
-# dat_file = 'path/to/vld/data' # the validation data path to caculate Youden Index
-dat_file = "/projectnb/vkolagrp/varuna/mri_pet/adrd_tool/data_varuna/data/0225/ADNI_HABS_NACCTEST_HARMONIZED.csv"
-vld_file = pd.read_csv("/projectnb/vkolagrp/skowshik/pet_project/mri_pet/adrd_tool/data_varuna/data/0225/val_0225_new_harmonization.csv")
-cnf_file = f'./data/toml_files/config_0224_amy_tau_no_csf_no_plasma.toml' # the path configuration file
-ckpt_path = '../ckpt/model_stage_1.ckpt' # the path to the model checkpoint
-
-dat_file = pd.read_csv(dat_file)
-print(dat_file)
-if_save = False
-
-# uncommment this to run without image embeddings
-# img_net="NonImg"
-# img_mode=-1
-
-img_net="SwinUNETREMB"
-img_mode=1
-
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-    
-# load saved Transformer
-device = 'cuda:0'
-mdl = ADRDModel.from_ckpt(ckpt_path, device=device) 
-print("All keys matched")
-print(f"Epoch: {torch.load(ckpt_path)['epoch']}")
-
-labels = ['amy_label', 'tau_label']
-# labels = ['tau_front_label', 'tau_occ_label', 'tau_medtemp_label', 'tau_lattemp_label', 'tau_medpar_label', 'tau_latpar_label']
 
 # %%
 from matplotlib import rc, rcParams
@@ -110,19 +77,8 @@ def save_predictions(dat_tst, scores_proba, scores, save_path=None, filename=Non
         
     id_df = pd.DataFrame(ids)
     cohort_df = pd.DataFrame(cohort)
-    
-    if 'fhs' in fname:
-        fhsid = ids = dat_file[['id', 'idtype', 'framid']]
-        fhsid_df = pd.DataFrame(fhsid)
-        if 'cdr_CDRGLOB' in dat_file:
-            df = pd.concat([fhsid_df, id_df, y_true_df, scores_proba_df, cdr_df, cohort_df], axis=1)
-        else:
-            df = pd.concat([fhsid_df, id_df, y_true_df, scores_proba_df, cohort_df], axis=1)
-    else:
-        if 'cdr_CDRGLOB' in dat_file:
-            df = pd.concat([id_df, y_true_df, scores_proba_df, cdr_df, cohort_df], axis=1)
-        else:
-            df = pd.concat([id_df, y_true_df, scores_proba_df, cohort_df], axis=1)
+    if 'cdr_CDRGLOB' in dat_file:
+        df = pd.concat([id_df, y_true_df, scores_proba_df, cdr_df, cohort_df], axis=1)
         
     if if_save:
         df.to_csv(save_path + filename, index=False)
@@ -172,7 +128,8 @@ def roc_auc_scores(y_true, y_pred, features):
 
     return fpr, tpr, auc_scores, thresholds
 
-def generate_predictions_for_data_file(dat_file, tst_filter_transform=None):
+def generate_predictions_for_data_file(dat_file, vld_file, cnf_file, img_mode,
+ labels, tst_filter_transform=None):
     # initialize datasets
     seed = 0
     print('Done.\nLoading testing dataset ...')
@@ -204,8 +161,11 @@ def generate_predictions_for_data_file(dat_file, tst_filter_transform=None):
     scores, scores_proba, y_pred, outputs = mdl.predict(dat_tst.features, _batch_size=128, fpr=fpr, tpr=tpr, thresholds=thresholds, img_transform=tst_filter_transform)
     
     # save model predictions
-    save_predictions(dat_tst, scores_proba, scores, f'{fname}.csv', if_save=if_save)
+    save_predictions(dat_tst, scores_proba, scores, save_path=save_path, filename=f'{fname}.csv', if_save=if_save)
     print('Done.')
+    
+    print('Generating performance reports')
+    met = generate_performance_report(dat_tst, y_pred, scores_proba)
     
     return outputs, met
     
@@ -279,14 +239,66 @@ class FilterImages:
 
 #%%
 if __name__ == '__main__':
+    fname = 'name_of_file' # the name of file you want to save the model predictions to
+    save_path = f'path/to/model/predictions' # the path where the model predictions will be saved
+    # dat_file = 'path/to/test/data' # the test data path
+    # dat_file = 'path/to/vld/data' # the validation data path to caculate Youden Index
+    dat_file = "/projectnb/vkolagrp/varuna/mri_pet/adrd_tool/data_varuna/data/0225/ADNI_HABS_NACCTEST_HARMONIZED.csv"
+    vld_file = "/projectnb/vkolagrp/skowshik/pet_project/mri_pet/adrd_tool/data_varuna/data/0225/val_0225_new_harmonization.csv"
+
+    # Uncomment this for stage 1
+    # cnf_file = f'./data/toml_files/config_0224_amy_tau_no_csf_no_plasma.toml' # the path configuration file
+    # ckpt_path = '../ckpt/model_stage_1.ckpt'
+    # labels = ['amy_label', 'tau_label']
+
+    # Uncomment this for stage 2
+    cnf_file = f'./data/toml_files/config_0224_tau_reg_no_csf_no_plasma.toml' # the path configuration file
+    ckpt_path = '../ckpt/model_stage_2.ckpt' # the path to the model checkpoint
+    labels = ['tau_medtemp_label', 'tau_lattemp_label','tau_medpar_label', 'tau_latpar_label', 'tau_front_label', 'tau_occ_label']
+
+    dat_file = pd.read_csv(dat_file)
+    vld_file = pd.read_csv(vld_file)
+    if "tau_front_label" in dat_file:
+        dat_file = dat_file[~dat_file['tau_front_label'].isna()].reset_index(drop=True)
+    
+    if "tau_front_label" in vld_file:
+        vld_file = vld_file[~vld_file['tau_front_label'].isna()].reset_index(drop=True)
+        
+    print(dat_file)
+    
+    save_path = "./"
+    fname = "test2"
+    if_save = True
+    
+
+    # uncommment this to run without image embeddings
+    # img_net="NonImg"
+    # img_mode=-1
+
+    img_net="SwinUNETREMB"
+    img_mode=1
+
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+        
+    # load saved Transformer
+    device = 'cuda:0'
+    mdl = ADRDModel.from_ckpt(ckpt_path, device=device) 
+    print("All keys matched")
+    print(f"Epoch: {torch.load(ckpt_path)['epoch']}")
+
+    #%%
     if img_mode in [0,2]:
         tst_filter_transform = FilterImages(dat_type='tst')
     else:
         tst_filter_transform = None
         
-    # 1. Generate predictions for a test case file
-    df_pred, met = generate_predictions_for_data_file(dat_file, tst_filter_transform)
+    df_pred, met = generate_predictions_for_data_file(dat_file, vld_file, cnf_file, img_mode, labels, tst_filter_transform)
+    
     #%%
     met_df = pd.DataFrame(met)
+    met_df = met_df[labels]
     print(met_df.round(2))
 
+
+# %%

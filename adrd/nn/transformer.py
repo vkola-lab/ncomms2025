@@ -49,21 +49,28 @@ class Transformer(torch.nn.Module):
         # embedding modules for source
     
         self.modules_emb_src = torch.nn.ModuleDict()
-        if self.img_net.lower() != "nonimg":
-            print('Downsample layers: ', self.layers)
-            self.img_model = nn.ImagingModelWrapper(arch=self.img_net, img_size=self.img_size, patch_size=self.patch_size, ckpt_path=self.imgnet_ckpt, train_backbone=self.train_imgnet, layers=self.layers, out_dim=self.d_model, device=self.device, fusion_stage=self.fusion_stage)
+        print('Downsample layers: ', self.layers)
+
+        # if self.img_net.lower() != "nonimg":
+        #     self.img_model = nn.ImagingModelWrapper(arch=self.img_net, img_size=self.img_size, patch_size=self.patch_size, ckpt_path=self.imgnet_ckpt, train_backbone=self.train_imgnet, layers=self.layers, out_dim=self.d_model, device=self.device, fusion_stage=self.fusion_stage)
             
         for k, info in src_modalities.items():
+            # ic(k)
+            # for key, val in info.items():
+                # ic(key, val)
             if info['type'] == 'categorical':
-                self.modules_emb_src[k] = torch.nn.Embedding(info['num_categories'], d_model)
+                self.modules_emb_src[k] = torch.nn.Embedding(info['num_categories'], d_model) 
             elif info['type'] == 'numerical':
                 self.modules_emb_src[k] = torch.nn.Sequential(
                     torch.nn.BatchNorm1d(info['shape'][0]),
                     torch.nn.Linear(info['shape'][0], d_model)
+                    # torch.nn.Tanh()
                 )
             elif info['type'] == 'imaging':
+                # print(info['shape'], info['img_shape'])
                 if self.img_net:
-                    self.modules_emb_src[k] = self.img_model
+                    # self.modules_emb_src[k] = self.img_model
+                    self.modules_emb_src[k] = nn.ImagingModelWrapper(arch=self.img_net, img_size=self.img_size, patch_size=self.patch_size, ckpt_path=self.imgnet_ckpt, train_backbone=self.train_imgnet, layers=self.layers, out_dim=self.d_model, device=self.device, fusion_stage=self.fusion_stage)
                     
             else:
                 # unrecognized
@@ -91,12 +98,22 @@ class Transformer(torch.nn.Module):
         # classifiers (binary only)
         self.modules_cls = torch.nn.ModuleDict()
         for k, info in tgt_modalities.items():
-            if info['type'] == 'categorical' and info['num_categories'] == 2:
+            if (info['type'] == 'categorical' and info['num_categories'] == 2) or (info['type'] == 'numerical'):
                 self.modules_cls[k] = torch.nn.Linear(d_model, 1)
+                torch.nn.init.constant_(self.modules_cls[k].bias, 5.0)  # Initialize biases to a positive value
+                torch.nn.init.xavier_uniform_(self.modules_cls[k].weight)  # Xavier initialization for weights
+            elif (info['type'] == 'categorical' and info['num_categories'] > 2):
+                self.modules_cls[k] = torch.nn.Linear(d_model, info['num_categories'])
+                torch.nn.init.constant_(self.modules_cls[k].bias, 5.0)  # Initialize biases to a positive value
+                torch.nn.init.xavier_uniform_(self.modules_cls[k].weight)  # Xavier initialization for weights
             else:
                 # unrecognized
                 raise ValueError
             
+        # print(self.pe)
+        # for n,p in self.pe.named_parameters():
+        #     print(n, p.requires_grad)
+        # raise ValueError
 
     def forward(self,
         x: dict[str, Tensor],
@@ -111,8 +128,11 @@ class Transformer(torch.nn.Module):
         if self.fusion_stage == "late":
             out_emb = {k: v for k,v in out_emb.items() if "img_MRI" not in k}
             img_out_emb = {k: v for k,v in out_emb.items() if "img_MRI" in k}
+            # for k,v in out_emb.items():
+                # print(k, v.size())
             mask_nonimg = {k: v for k,v in mask.items() if "img_MRI" not in k}
-            out_trf = self.forward_trf(out_emb, mask_nonimg)
+            out_trf = self.forward_trf(out_emb, mask_nonimg) # (8,128) + (8,50,128)
+            # print("out_trf: ", out_trf.size())
             out_trf = torch.concatenate()
         else:
             out_trf = self.forward_trf(out_emb, mask)
@@ -120,7 +140,10 @@ class Transformer(torch.nn.Module):
         out_cls = self.forward_cls(out_trf)
             
         if return_out_emb:
-            return out_emb, out_cls
+            return out_trf
+        
+        # if return_out_emb:
+        #     return out_trf
         return out_cls
 
     def forward_emb(self,
@@ -153,6 +176,7 @@ class Transformer(torch.nn.Module):
                         # print("mask is False, out_emb[k]: ", out_emb[k].size())
                     
                 else:
+                    # print(k, x[k].shape)
                     out_emb[k] = self.modules_emb_src[k](x[k])
                     
                 # out_emb[k] = self.modules_emb_src[k](x[k])
@@ -179,6 +203,8 @@ class Transformer(torch.nn.Module):
         
         emb_src = torch.stack([o for o in out_emb.values()], dim=0)
         # print('emb_src: ', emb_src.size())
+        
+        
 
         self.pe.index = -1
         emb_src = self.pe(emb_src)
@@ -201,12 +227,17 @@ class Transformer(torch.nn.Module):
         
         # concatenate source masks and target masks
         mask_all = torch.concatenate((mask_tgt, mask_src), dim=1)
+        
+        # repeat mask_all to fit transformer
+        mask_all = mask_all.unsqueeze(1).expand(-1, S + T, -1).repeat(self.nhead, 1, 1)
 
         # run transformer
         out_trf = self.transformer(
             src = emb_all,
-            src_key_padding_mask = mask_all,
+            mask = mask_all,
         )[0]
+        # print('out_trf: ', out_trf.size())
+        # out_trf = {k: out_trf[i] for i, k in enumerate(tgt_iter)}
         return out_trf
 
     def forward_cls(self,
