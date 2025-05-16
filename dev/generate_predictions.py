@@ -247,12 +247,12 @@ if __name__ == '__main__':
     vld_file = "/projectnb/vkolagrp/skowshik/pet_project/mri_pet/adrd_tool/data_varuna/data/0225/val_0225_new_harmonization.csv"
 
     # Uncomment this for stage 1
-    # cnf_file = f'./data/toml_files/config_0224_amy_tau_no_csf_no_plasma.toml' # the path configuration file
+    # cnf_file = f'./data/toml_files/stage_1.toml' # the path configuration file
     # ckpt_path = '../ckpt/model_stage_1.ckpt'
     # labels = ['amy_label', 'tau_label']
 
     # Uncomment this for stage 2
-    cnf_file = f'./data/toml_files/config_0224_tau_reg_no_csf_no_plasma.toml' # the path configuration file
+    cnf_file = f'./data/toml_files/stage_2.toml' # the path configuration file
     ckpt_path = '../ckpt/model_stage_2.ckpt' # the path to the model checkpoint
     labels = ['tau_medtemp_label', 'tau_lattemp_label','tau_medpar_label', 'tau_latpar_label', 'tau_front_label', 'tau_occ_label']
 
@@ -268,7 +268,7 @@ if __name__ == '__main__':
     
     save_path = "./"
     fname = "test2"
-    if_save = True
+    if_save = False
     
 
     # uncommment this to run without image embeddings

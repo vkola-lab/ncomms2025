@@ -1705,14 +1705,6 @@
 	type = "categorical"
 	num_categories = 3
 
-	[feature.csf_AMYLCSF]
-	type = "categorical"
-	num_categories = 2
-
-	[feature.csf_CSFTAU]
-	type = "categorical"
-	num_categories = 2
-
 	[feature.cdr_MEMORY]
 	type = "numerical"
 	shape = [1]
