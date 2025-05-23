@@ -74,7 +74,7 @@ pip install .
 2. **Set Up Training Script**  
    - Navigate to the root directory of the repository.  
    - Update the training and validation paths in `dev/train.sh`.  
-   - Sample demo data is available in the `pseudodata/` directory.
+   - Sample demo data is available in the `pseudodata/` directory. Please note that this pseudodata is completely random.
 
 3. **Specify Training Mode**  
    - **With MRI embeddings**:  
